@@ -22,23 +22,11 @@ jobs:
       - run:
           name: Setup database
           command: |
-            docker-compose exec app bash -c
-# docker-compose exec app bash -c ''左に何か入るらしい…
-            bundle exec rake db:create
-            bundle exec rake db:schema:load
+            docker-compose exec app bash -c 'yes n
       - run:
           name: Run rspec
           command: docker-compose exec app rspec
-  rubocop:
-    working_directory: ~/app
-    docker:
-      - image: cimg/ruby:2.7.3
-    resource_class: small
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - gemfiles-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+@@ -40,6 +40,9 @@ jobs:
             - gemfiles-{{ .Branch }}-
             - gemfiles-master-
       - run: bundle config --local path vendor/bundle
