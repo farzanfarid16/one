@@ -1,38 +1,55 @@
 version: 2.1
-jobs:
-  rspec:
-    working_directory: ~/app
-    docker:
-      - image: cimg/ruby:2.7.3
-    resource_class: small
+orbs:
+  gcp-cli: circleci/gcp-cli@2.4.1
+
+commands:
+  tf-gcp-install-plan:
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - gcp-cli/install
+      - gcp-cli/initialize
       - run:
-          name: Setup environment variable
-          command: |
-            echo "export COMPOSE_FILE=docker-compose.ci.yml" >> $BASH_ENV
+           name: tf install
+           command: |
+              apt-get install wget curl unzip software-properties-common gnupg2 -y
+              curl -fsSL https://apt.releases.hashicorp.com/gpg | apt-key add -
+              apt-add-repository "deb [arch=$(dpkg --print-architecture)] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+              apt-get update -y
+              apt-get install terraform -y
+              terraform -v
       - run:
-          name: Start containers and verify it is working
-          command: |
-            set -x
-            docker-compose up -d
-            docker exec app_app curl -4 --retry 10 --retry-delay 3 --retry-connrefused http://localhost:3000
-      - run:
-          name: Setup database
-          command: |
-            docker-compose exec app bash -c 'yes n
-      - run:
-          name: Run rspec
-          command: docker-compose exec app rspec
-@@ -40,6 +40,9 @@ jobs:
-            - gemfiles-{{ .Branch }}-
-            - gemfiles-master-
-      - run: bundle config --local path vendor/bundle
-      - run:
-          name: update bundler
-          command: gem install bundler:2.3.20
-      - run:
-          name: bundle install
-          command: bundle check || bundle install --jobs=8 --clean
+           name: terraform init & plan
+           command: |
+              terraform init -input=false
+              terraform plan -out tfapply
+jobs:
+ gcp-tf-plan:
+    executor: gcp-cli/machine
+    steps:
+      - checkout
+      - tf-gcp-install-plan
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+ gcp-tf-apply:
+   executor: gcp-cli/machine
+   steps:
+     - attach_workspace:
+         at: .
+     - run:
+         name: terraform
+         command: |
+           terraform apply -auto-approve tfapply
+         no_output_timeout: 3h     
+     - persist_to_workspace:
+         root: .
+         paths:
+           - .
+
+workflows:
+  tf-gcp-nomad:
+    jobs:
+      - gcp-tf-plan:
+           context: org-gcp
